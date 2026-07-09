@@ -171,7 +171,7 @@ TEMPLATE = r"""<!doctype html>
   <script>
   // ==== CONFIG ====
   // Pon aquí la URL de tu repo para mostrar el botón "GitHub" en la barra superior:
-  const REPO_URL = "";
+  const REPO_URL = "https://github.com/enriquecordero/copilot-vscode-guia";
 
   // ==== Decodifica el Markdown (base64 → UTF-8) ====
   const b64 = document.getElementById("md").textContent.trim();
