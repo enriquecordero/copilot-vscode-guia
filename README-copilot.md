@@ -20,11 +20,12 @@
 11. [MCP Servers](#11-mcp-servers)
 12. [Agent Plugins (preview)](#12-agent-plugins-preview)
 13. [Combinando todo: recetas prácticas](#13-combinando-todo-recetas-prácticas)
-14. [Adopción en proyectos existentes y monorepos grandes](#14-adopción-en-proyectos-existentes-y-monorepos-grandes)
-15. [Estructura final del proyecto](#15-estructura-final-del-proyecto)
-16. [Tabla de comandos y troubleshooting](#16-tabla-de-comandos-y-troubleshooting)
-17. [Tips para instrucciones efectivas](#17-tips-para-instrucciones-efectivas)
-18. [Recursos oficiales](#18-recursos-oficiales)
+14. [Orquestación con handoffs (Planner, BE, FE, QA)](#14-orquestación-con-handoffs-planner-be-fe-qa)
+15. [Adopción en proyectos existentes y monorepos grandes](#15-adopción-en-proyectos-existentes-y-monorepos-grandes)
+16. [Estructura final del proyecto](#16-estructura-final-del-proyecto)
+17. [Tabla de comandos y troubleshooting](#17-tabla-de-comandos-y-troubleshooting)
+18. [Tips para instrucciones efectivas](#18-tips-para-instrucciones-efectivas)
+19. [Recursos oficiales](#19-recursos-oficiales)
 
 ---
 
@@ -149,7 +150,7 @@ No necesitas `/init`. Puedes crear el archivo directamente:
 
 VS Code también reconoce como instrucciones **always-on** (equivalentes a `copilot-instructions.md`):
 
-- **`AGENTS.md`** — estándar reconocido por múltiples agentes (encaja con la portabilidad de los Skills). Va en la raíz del workspace y, de forma **experimental**, admite un `AGENTS.md` **por subcarpeta** (activando `chat.useNestedAgentsMdFiles`) — útil en monorepos para reglas por módulo sin depender sólo de `applyTo` (ver §14).
+- **`AGENTS.md`** — estándar reconocido por múltiples agentes (encaja con la portabilidad de los Skills). Va en la raíz del workspace y, de forma **experimental**, admite un `AGENTS.md` **por subcarpeta** (activando `chat.useNestedAgentsMdFiles`) — útil en monorepos para reglas por módulo sin depender sólo de `applyTo` (ver §15).
 - **`CLAUDE.md`** — se aplica como instrucciones always-on, igual que `AGENTS.md`.
 
 Puedes convivir con los tres; elige uno como fuente principal para no duplicar reglas.
@@ -799,7 +800,7 @@ MCP) en un solo paquete distribuible desde un **marketplace**.
 
 - ✅ **Adopción sin construir**: instalas un workflow probado en vez de escribir cada archivo a mano.
 - ✅ **Distribución**: es la vía natural para repartir un mismo paquete de customizaciones a
-  **muchos equipos o módulos** — directamente relevante para la §14 (monorepos): en vez de copiar
+  **muchos equipos o módulos** — directamente relevante para la §15 (monorepos): en vez de copiar
   `.github/agents/`, `skills/` y `hooks/` a cada repo, publicas un plugin y cada equipo lo instala.
 - ✅ **Consistencia**: todos arrancan con la misma configuración base.
 
@@ -898,7 +899,167 @@ postgres (MCP)            → valida contra el schema real
 
 ---
 
-## 14. Adopción en proyectos existentes y monorepos grandes
+## 14. Orquestación con handoffs (Planner, BE, FE, QA)
+
+Ejemplo completo y copy-paste de un workflow multi-agente **guiado por handoffs**: un
+**planificador** que delega a **backend**, luego **frontend**, luego **QA** — donde *tú apruebas
+cada transición*. Es la versión supervisada de la orquestación (compárala con los subagentes
+automáticos de la [§9](#9-orquestación-agentes-que-hablan-con-agentes)).
+
+> Docs: [Custom agents — Handoffs](https://code.visualstudio.com/docs/copilot/customization/custom-agents).
+> *"After a chat response completes, handoff buttons appear that let users move to the next agent with relevant context and a pre-filled prompt."*
+
+### Cómo funciona un handoff
+
+En el frontmatter de un agente declaras botones que aparecen **al terminar su respuesta**:
+
+| Campo | Qué hace | Default |
+|---|---|---|
+| `label` | Texto del botón | *requerido* |
+| `agent` | Agente destino (debe coincidir con su `name`) | *requerido* |
+| `prompt` | Texto pre-cargado en el input del destino | opcional |
+| `send` | Si `true`, envía el prompt automáticamente | `false` |
+| `model` | Modelo para ese handoff (formato `Nombre (vendor)`) | el actual |
+
+Dos claves de la orquestación con handoffs:
+
+- **La sesión es compartida**: cuando arranca el backend, *ya ve el plan*; cuando arranca el frontend, ve los endpoints que creó el backend. No repites contexto.
+- **El humano aprueba cada salto** (`send: false`): revisas el prompt pre-cargado antes de enviarlo. Con `send: true` el salto es automático.
+
+**Escenario:** agregar la feature *"comentarios en tareas"* (endpoint + pantalla + tests) a TaskFlow (.NET + Angular). Los 4 agentes van en `.github/agents/`.
+
+### 1️⃣ `feature-planner.agent.md` — planificador (solo lectura)
+
+```markdown
+---
+name: 'feature-planner'
+description: 'Analiza el codebase y produce un plan de implementación. No escribe código.'
+tools: ['read', 'search/codebase', 'search/usages']   # ¡sin edit! solo planifica
+model: 'Claude Sonnet 4.5 (copilot)'
+user-invocable: true
+handoffs:
+  - label: '→ Implementar backend'
+    agent: backend-dev
+    prompt: 'Implementa la parte de backend del plan anterior, paso por paso.'
+    send: false
+    model: 'Claude Sonnet 4.5 (copilot)'
+---
+
+Eres un arquitecto de software. Ante una feature:
+1. Explora el codebase relevante (entidades, controllers, componentes existentes).
+2. Produce un **plan numerado** separando trabajo de **backend**, **frontend** y **QA**.
+3. Señala archivos a tocar, contratos de API (DTOs, rutas) y riesgos.
+NO escribes código: tu entregable es el plan. Al terminar, ofrece el handoff a `backend-dev`.
+```
+
+### 2️⃣ `backend-dev.agent.md` — backend (.NET)
+
+```markdown
+---
+name: 'backend-dev'
+description: 'Implementa la API en ASP.NET Core 8 siguiendo el plan.'
+tools: ['read', 'edit', 'search/codebase', 'execute/runInTerminal']
+model: 'Claude Sonnet 4.5 (copilot)'
+handoffs:
+  - label: '→ Implementar frontend'
+    agent: frontend-dev
+    prompt: 'El backend ya está listo (revisa los endpoints y DTOs de arriba). Implementa el frontend que los consume.'
+    send: false
+  - label: '↩ Volver a planificar'
+    agent: feature-planner
+    prompt: 'Encontré un problema al implementar; revisemos el plan.'
+    send: false
+---
+
+Eres experto en ASP.NET Core 8 (Controller → Service → Repository, DI por constructor, DTOs).
+Implementas SOLO el backend del plan. Validas con `dotnet build` antes de terminar.
+Al finalizar, resume los endpoints/DTOs creados y ofrece el handoff a `frontend-dev`.
+```
+
+### 3️⃣ `frontend-dev.agent.md` — frontend (Angular)
+
+```markdown
+---
+name: 'frontend-dev'
+description: 'Implementa la UI en Angular 17 que consume la API.'
+tools: ['read', 'edit', 'search/codebase', 'execute/runInTerminal']
+model: 'Claude Sonnet 4.5 (copilot)'
+handoffs:
+  - label: '→ Probar y validar (QA)'
+    agent: qa-engineer
+    prompt: 'La feature está implementada (backend + frontend). Escribe y ejecuta las pruebas y revisa la calidad.'
+    send: false
+---
+
+Eres experto en Angular 17 (standalone + signals, `async` pipe, tipado estricto).
+Implementas SOLO el frontend, consumiendo los endpoints que definió `backend-dev`.
+Validas con `ng build`. Al terminar, ofrece el handoff a `qa-engineer`.
+```
+
+### 4️⃣ `qa-engineer.agent.md` — QA (tests + revisión)
+
+```markdown
+---
+name: 'qa-engineer'
+description: 'Escribe/ejecuta tests (xUnit + Jasmine) y revisa la calidad de la feature.'
+tools: ['read', 'edit', 'search/codebase', 'search/usages', 'execute/runInTerminal']
+model: 'Claude Sonnet 4.5 (copilot)'
+handoffs:
+  - label: '↩ Corregir backend'
+    agent: backend-dev
+    prompt: 'QA encontró estos fallos en la API (ver arriba). Corrígelos.'
+    send: false
+  - label: '↩ Corregir frontend'
+    agent: frontend-dev
+    prompt: 'QA encontró estos fallos en la UI (ver arriba). Corrígelos.'
+    send: false
+---
+
+Eres ingeniero de QA. Escribes tests unitarios/integración, los ejecutas
+(`dotnet test`, `ng test`) y revisas edge cases. Si todo pasa, lo confirmas.
+Si algo falla, resumes los fallos y ofreces el handoff al agente responsable.
+```
+
+### El flujo de la orquestación
+
+```
+   [Tú] seleccionas 'feature-planner' y describes la feature
+            │
+            ▼
+   feature-planner  ── produce el plan (solo lectura)
+            │  clic botón "→ Implementar backend"   (send:false → revisas el prompt)
+            ▼
+   backend-dev      ── crea controller + servicio + DTOs, dotnet build
+            │  clic "→ Implementar frontend"
+            ▼
+   frontend-dev     ── crea el componente Angular, ng build
+            │  clic "→ Probar y validar (QA)"
+            ▼
+   qa-engineer      ── escribe y corre tests
+            │
+     ┌──────┴───────── ¿fallos?
+     │ sí                            │ no
+     ▼                              ▼
+  "↩ Corregir backend/frontend"   ✅ feature lista
+  (vuelve al dev responsable)
+```
+
+- **Los back-edges** (`↩ Corregir…`) hacen la orquestación realista: QA no solo avanza, también devuelve el trabajo al dev correcto si encuentra bugs. Es un grafo, no solo una línea.
+- **`agent:` debe coincidir con el `name`** del `.agent.md` destino, y los cuatro archivos van en `.github/agents/`.
+
+### Handoffs vs. subagentes — no confundir
+
+| | **Handoffs** (esta sección) | **Subagentes** (`agents:` + tool `agent`) |
+|---|---|---|
+| Quién transiciona | El **humano** (clic en botón) | El **agente** (automático) |
+| Contexto | **Compartido** (misma sesión) | **Aislado** por subagente |
+| Ideal para | Workflow supervisado paso a paso | Pipeline autónomo sin intervención |
+
+Si quisieras que un **orquestador** hiciera todo esto solo (sin clic), usarías el campo `agents:` + el tool set `agent` — ver [§9](#9-orquestación-agentes-que-hablan-con-agentes). Los handoffs son la versión *guiada por ti*.
+
+---
+
+## 15. Adopción en proyectos existentes y monorepos grandes
 
 Aplicar esto en un proyecto *greenfield* (nuevo) es fácil. El reto real es un **codebase existente, enorme, con muchos módulos, deuda técnica y convenciones no escritas**. Aquí la estrategia es distinta: **no configures todo de una vez**. Adopción incremental, por capas y por módulo.
 
@@ -1056,7 +1217,7 @@ Empaqueta la migración como un **Skill** (§6) con el procedimiento y los scrip
 
 ---
 
-## 15. Estructura final del proyecto
+## 16. Estructura final del proyecto
 
 ```
 mi-proyecto/
@@ -1093,7 +1254,7 @@ mi-proyecto/
 
 ---
 
-## 16. Tabla de comandos y troubleshooting
+## 17. Tabla de comandos y troubleshooting
 
 ### Comandos en el chat
 
@@ -1126,7 +1287,7 @@ Si una instrucción/agente no se aplica:
 
 ---
 
-## 17. Tips para instrucciones efectivas
+## 18. Tips para instrucciones efectivas
 
 1. **Incluye el "por qué"** de cada regla.
    ```
@@ -1140,7 +1301,7 @@ Si una instrucción/agente no se aplica:
 
 ---
 
-## 18. Recursos oficiales
+## 19. Recursos oficiales
 
 **General**
 - [Copilot in VS Code — Overview](https://code.visualstudio.com/docs/copilot/overview)
