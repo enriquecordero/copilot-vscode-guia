@@ -22,10 +22,11 @@
 13. [Combinando todo: recetas prácticas](#13-combinando-todo-recetas-prácticas)
 14. [Orquestación con handoffs (Planner, BE, FE, QA)](#14-orquestación-con-handoffs-planner-be-fe-qa)
 15. [Adopción en proyectos existentes y monorepos grandes](#15-adopción-en-proyectos-existentes-y-monorepos-grandes)
-16. [Estructura final del proyecto](#16-estructura-final-del-proyecto)
-17. [Tabla de comandos y troubleshooting](#17-tabla-de-comandos-y-troubleshooting)
-18. [Tips para instrucciones efectivas](#18-tips-para-instrucciones-efectivas)
-19. [Recursos oficiales](#19-recursos-oficiales)
+16. [Operar y controlar al agente (modos, contexto, loop, permisos)](#16-operar-y-controlar-al-agente-modos-contexto-loop-permisos)
+17. [Estructura final del proyecto](#17-estructura-final-del-proyecto)
+18. [Tabla de comandos y troubleshooting](#18-tabla-de-comandos-y-troubleshooting)
+19. [Tips para instrucciones efectivas](#19-tips-para-instrucciones-efectivas)
+20. [Recursos oficiales](#20-recursos-oficiales)
 
 ---
 
@@ -1217,7 +1218,99 @@ Empaqueta la migración como un **Skill** (§6) con el procedimiento y los scrip
 
 ---
 
-## 16. Estructura final del proyecto
+## 16. Operar y controlar al agente (modos, contexto, loop, permisos)
+
+Hasta aquí *configuraste* al agente (instructions, prompts, skills, agents, hooks). Esta sección es
+lo otro: cómo lo **operas y lo contienes** día a día — en qué modo trabaja, qué contexto le das,
+cómo es su bucle de ejecución y cómo apruebas/limitas lo que hace.
+
+### Los tres modos del chat: Ask · Edit · Agent
+
+Copilot Chat tiene tres modos. Tus **custom agents** (§7) corren *sobre* el modo **Agent**.
+
+| Modo | Qué hace | Cuándo |
+|---|---|---|
+| **Ask** | Responde y explica; **no** edita archivos ni corre nada | Preguntar, entender código, explorar opciones |
+| **Edit** | Aplica ediciones a los archivos que **tú** eliges (multi-archivo), con diff | Cambios acotados donde tú marcas el alcance |
+| **Agent** | **Autónomo**: decide qué archivos tocar, corre tools/terminal y **itera** hasta terminar | Tareas end-to-end (la base de todo lo de esta guía) |
+
+> Cambias de modo con el selector del chat. Todo el *Context Engineering* (instructions, agents, tools, hooks) aplica en **Agent**.
+
+### Darle contexto: `#`-mentions, adjuntos e imágenes
+
+Además de lo que Copilot infiere solo, tú puedes **adjuntar contexto explícito**:
+
+> *"You can explicitly add context to your prompt by typing `#` followed by the context item you want to mention."* — VS Code Docs
+
+| Forma | Ejemplo | Qué añade |
+|---|---|---|
+| `#` + archivo/carpeta | `#UserService.cs` | Ese archivo o carpeta como contexto |
+| `#` + símbolo | `#calcularTotal` | Una función/clase concreta |
+| `#codebase` | `#codebase` | Búsqueda semántica en todo el repo |
+| `#fetch` | `#fetch https://…` | El contenido de una URL |
+| **Drag & drop** | arrastrar del Explorer/editor | Archivos/carpetas al chat |
+| **Imágenes (vision)** | arrastrar/pegar un screenshot | Adjunta la imagen y preguntas sobre ella |
+| **Browser → chat** | *Add Element / Screenshot / Console Logs to Chat* | Contexto desde el browser integrado |
+
+> ⚠️ **No confundas `#context` con `#tools`.** Ambos usan `#`, pero los de §8 (`#search/codebase`, `#edit/editFiles`…) son *herramientas que el agente ejecuta*; estos son *contexto que tú adjuntas*. `#codebase` existe en ambas caras (es tool de búsqueda y forma de adjuntar el repo).
+
+### Variables de prompt (en `*.prompt.md` y agents)
+
+Para hacer los prompt files (§5) reutilizables, la doc confirma estas variables integradas:
+
+| Variable | Qué inserta |
+|---|---|
+| `${selection}` | El texto seleccionado en el editor |
+| `${input:nombre}` | Pide un valor al invocar (lo que ya usamos en §5) |
+| `${input:nombre:placeholder}` | Igual, con texto de ayuda en el input |
+
+```markdown
+Refactoriza ${selection} siguiendo el patrón de `${input:patron:ej. Repository}`.
+```
+
+> Para pedir datos de forma interactiva también existe el tool `vscode/askQuestions`. Las variables estándar de VS Code (`${workspaceFolder}`, `${file}`…) suelen estar disponibles, pero la doc de prompt files solo documenta explícitamente `${selection}` y `${input:...}`.
+
+### El loop agéntico y sus límites
+
+En modo Agent, Copilot no responde una sola vez: corre un bucle **pensar → actuar → observar** y
+se **auto-corrige** hasta terminar.
+
+> *"responds to compile and lint errors, monitors terminal output, and **auto-corrects in a loop until the task is completed**"* — VS Code Blog
+
+Está **acotado y es configurable**:
+
+| Setting | Qué hace | Default |
+|---|---|---|
+| `chat.agent.maxRequests` | Nº máx. de requests por turno; al llegar, **se detiene y te pregunta si continúa** | `25` |
+| `github.copilot.chat.agent.autoFix` | Auto-diagnostica y corrige errores en el código generado (self-healing) | `true` |
+
+> Aquí encajan tus **hooks** (§10): el "ciclo del agente" que mencionan es *este* loop. `PreToolUse`/`PostToolUse` disparan en **cada vuelta**, no una sola vez por turno.
+
+### Aprobaciones y permisos (contener al agente)
+
+Antes de correr acciones sensibles (comandos de terminal, ediciones), el agente **pide aprobación**:
+apruebas o deniegas cada tool call. Puedes ajustar cuánta autonomía darle:
+
+| Setting | Qué hace | Default |
+|---|---|---|
+| `chat.tools.terminal.enableAutoApprove` | Aprueba comandos de terminal automáticamente | `true` |
+| `chat.tools.global.autoApprove` | Aprueba **todas** las tools sin preguntar — ⚠️ **desactiva protecciones de seguridad** | `false` |
+
+- **Niveles de permiso**: van desde "aprobar todo a mano" hasta "ejecución autónoma".
+- **Agent sandboxing**: restringe acceso a **filesystem y red a nivel del sistema operativo**, para dejar correr al agente con red de seguridad.
+
+> **Aprobaciones vs. Hooks**: las aprobaciones son *interactivas* (tú decides en el momento); los hooks (§10) son la *política determinística* que se aplica sola, sin importar el prompt. Se complementan: usa hooks para lo que **siempre** debe bloquearse (p. ej. `rm -rf`, tocar `legacy/`) y las aprobaciones para el resto.
+
+### Sesiones y checkpoints
+
+- **Sesiones persistentes**: el hilo de conversación se conserva y se **comparte** entre la Chat view y la ventana de Agents; puedes retomar donde quedaste.
+- **Checkpoints**: puedes **deshacer las ediciones del agente** y volver a un punto anterior si una iteración salió mal — clave cuando el loop tocó varios archivos.
+
+> Docs: [Agent mode](https://code.visualstudio.com/blogs/2025/04/07/agentMode) · [Copilot settings reference](https://code.visualstudio.com/docs/copilot/reference/copilot-settings) · [Manage context](https://code.visualstudio.com/docs/copilot/chat/copilot-chat-context)
+
+---
+
+## 17. Estructura final del proyecto
 
 ```
 mi-proyecto/
@@ -1254,7 +1347,7 @@ mi-proyecto/
 
 ---
 
-## 17. Tabla de comandos y troubleshooting
+## 18. Tabla de comandos y troubleshooting
 
 ### Comandos en el chat
 
@@ -1287,7 +1380,7 @@ Si una instrucción/agente no se aplica:
 
 ---
 
-## 18. Tips para instrucciones efectivas
+## 19. Tips para instrucciones efectivas
 
 1. **Incluye el "por qué"** de cada regla.
    ```
@@ -1301,7 +1394,7 @@ Si una instrucción/agente no se aplica:
 
 ---
 
-## 19. Recursos oficiales
+## 20. Recursos oficiales
 
 **General**
 - [Copilot in VS Code — Overview](https://code.visualstudio.com/docs/copilot/overview)
