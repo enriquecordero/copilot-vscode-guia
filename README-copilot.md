@@ -21,12 +21,13 @@
 12. [Agent Plugins (preview)](#12-agent-plugins-preview)
 13. [Combinando todo: recetas prácticas](#13-combinando-todo-recetas-prácticas)
 14. [Orquestación con handoffs (Planner, BE, FE, QA)](#14-orquestación-con-handoffs-planner-be-fe-qa)
-15. [Adopción en proyectos existentes y monorepos grandes](#15-adopción-en-proyectos-existentes-y-monorepos-grandes)
-16. [Operar y controlar al agente (modos, contexto, loop, permisos)](#16-operar-y-controlar-al-agente-modos-contexto-loop-permisos)
-17. [Estructura final del proyecto](#17-estructura-final-del-proyecto)
-18. [Tabla de comandos y troubleshooting](#18-tabla-de-comandos-y-troubleshooting)
-19. [Tips para instrucciones efectivas](#19-tips-para-instrucciones-efectivas)
-20. [Recursos oficiales](#20-recursos-oficiales)
+15. [El AI-SDLC: orquestación de agentes con validación humana](#15-el-ai-sdlc-orquestación-de-agentes-con-validación-humana)
+16. [Adopción en proyectos existentes y monorepos grandes](#16-adopción-en-proyectos-existentes-y-monorepos-grandes)
+17. [Operar y controlar al agente (modos, contexto, loop, permisos)](#17-operar-y-controlar-al-agente-modos-contexto-loop-permisos)
+18. [Estructura final del proyecto](#18-estructura-final-del-proyecto)
+19. [Tabla de comandos y troubleshooting](#19-tabla-de-comandos-y-troubleshooting)
+20. [Tips para instrucciones efectivas](#20-tips-para-instrucciones-efectivas)
+21. [Recursos oficiales](#21-recursos-oficiales)
 
 ---
 
@@ -151,7 +152,7 @@ No necesitas `/init`. Puedes crear el archivo directamente:
 
 VS Code también reconoce como instrucciones **always-on** (equivalentes a `copilot-instructions.md`):
 
-- **`AGENTS.md`** — estándar reconocido por múltiples agentes (encaja con la portabilidad de los Skills). Va en la raíz del workspace y, de forma **experimental**, admite un `AGENTS.md` **por subcarpeta** (activando `chat.useNestedAgentsMdFiles`) — útil en monorepos para reglas por módulo sin depender sólo de `applyTo` (ver §15).
+- **`AGENTS.md`** — estándar reconocido por múltiples agentes (encaja con la portabilidad de los Skills). Va en la raíz del workspace y, de forma **experimental**, admite un `AGENTS.md` **por subcarpeta** (activando `chat.useNestedAgentsMdFiles`) — útil en monorepos para reglas por módulo sin depender sólo de `applyTo` (ver §16).
 - **`CLAUDE.md`** — se aplica como instrucciones always-on, igual que `AGENTS.md`.
 
 Puedes convivir con los tres; elige uno como fuente principal para no duplicar reglas.
@@ -349,6 +350,8 @@ Ver `examples/migracion-esperada.cs` como referencia del formato correcto.
 ```
 /create-skill
 ```
+
+> ⭐ **No arranques de cero.** La galería oficial **[Awesome GitHub Copilot](https://awesome-copilot.github.com/)** tiene **skills, agents, instructions, prompts y plugins** contribuidos por la comunidad, listos para copiar y adaptar. Es el mejor lugar para tomar ideas al crear tus propios skills y custom agents (§7). Ver también §21.
 
 ### Cómo mantenerlo
 
@@ -801,7 +804,7 @@ MCP) en un solo paquete distribuible desde un **marketplace**.
 
 - ✅ **Adopción sin construir**: instalas un workflow probado en vez de escribir cada archivo a mano.
 - ✅ **Distribución**: es la vía natural para repartir un mismo paquete de customizaciones a
-  **muchos equipos o módulos** — directamente relevante para la §15 (monorepos): en vez de copiar
+  **muchos equipos o módulos** — directamente relevante para la §16 (monorepos): en vez de copiar
   `.github/agents/`, `skills/` y `hooks/` a cada repo, publicas un plugin y cada equipo lo instala.
 - ✅ **Consistencia**: todos arrancan con la misma configuración base.
 
@@ -1060,7 +1063,106 @@ Si quisieras que un **orquestador** hiciera todo esto solo (sin clic), usarías 
 
 ---
 
-## 15. Adopción en proyectos existentes y monorepos grandes
+## 15. El AI-SDLC: orquestación de agentes con validación humana
+
+El AI-SDLC es un **framework de 6 etapas encadenadas** que lleva *de un input de negocio crudo a un
+handoff técnico ejecutable*, **sin escribir código a mano hasta el final**. No es una herramienta: es
+un **proceso**. Cada etapa es un agente de IA que **recibe un artefacto auditable y entrega otro
+estructurado** que alimenta a la siguiente. Entre etapa y etapa hay un **HITL gate** (Human-in-the-Loop):
+un punto de validación humana obligatoria que impide avanzar sin revisión.
+
+> **El problema no es la IA — es la ausencia de un proceso repetible alrededor de ella.** La IA amplifica
+> errores tan rápido como acelera el trabajo. El HITL gate es el **mecanismo de calidad**, no un trámite.
+
+### La teoría de la orquestación
+
+*Orquestar* no es un agente gigante que lo hace todo, sino **coordinar varios agentes especializados en
+una cadena** donde el *output* de uno es el *input* del siguiente, con **puntos de control entre pasos**.
+Una línea de ensamblaje, no un genio omnisciente. La cadena descansa en cuatro conceptos:
+
+- **Fronteras de altitud.** Cada etapa opera a un nivel de abstracción y **no baja al siguiente**:
+  Negocio → Funcional → Visual → Técnico. Una decisión de bajo nivel tomada demasiado pronto *contamina*
+  las de alto nivel. Respetar la frontera es lo que hace cada artefacto auditable y firmable por el rol
+  correcto (el BRD lo firma un sponsor; el Handoff, un Tech Lead).
+- **HITL gate.** La IA no valida su propia calidad; el humano sí. El gate es **dónde se corta la
+  propagación del error**. El humano no es un cuello de botella: es el control.
+- **El artefacto es la interfaz.** Lo que pasa de una etapa a otra no es la conversación (efímera), sino
+  un **artefacto estructurado y citado** que funciona como contrato. Eso da reproducibilidad.
+- **Trazabilidad o nada.** Cada afirmación referencia su fuente (`§`, `archivo:línea`, `BRD-REQ-XXX`).
+  Lo que no tiene fuente se degrada a supuesto — nunca a hecho.
+
+**¿Por qué encadenar en vez de un solo agente?** Porque acota el contexto de cada etapa (menos
+alucinación), hace cumplir las fronteras por diseño, y crea puntos de control auditables. Y la cadena
+**no es lineal pura: es un grafo**. Cuando una etapa río abajo descubre un hueco, emite un **loop-back**:
+en vez de *parchar hacia adelante*, el flujo **retrocede, enriquece el artefacto de origen y regenera**.
+Es *fail-fast hacia atrás*.
+
+### Las 6 etapas — qué significa cada una
+
+**1 · Discovery / Research** *(opcional)* — **entender el problema antes de comprometerse a construir**.
+Es la fase *divergente*: explora contexto regulatorio, competencia y patrones antes de que las siguientes
+etapas *converjan*. Entrega un *dossier* citado. Sin esto, se construye sobre supuestos ("una app mejor")
+en vez del dolor real del usuario.
+
+**2 · BRD — Business Requirements** — el **contrato de negocio**: el *qué* y el *por qué*, firmable por
+un sponsor (objetivos SMART, KPIs, alcance con *out-of-scope* explícito). **Frontera: cero tecnología** —
+un BRD que dice "microservicios" ya rompió la altitud. Resuelve las features sin norte de negocio y el
+*scope creep*.
+
+**3 · PRD — Product Requirements** — el *qué* **funcional**: descompone el BRD en **historias verificables
+por QA sin conocer la implementación** (Épicas → HU → criterios en **Gherkin**: Given/When/Then).
+**Frontera: funcional, no técnico** — describe comportamiento observable, no "usar Redis". Resuelve el
+salto de negocio a código sin especificar comportamiento testeable.
+
+**4 · Diseño / Wireframes** *(opcional)* — el **contrato visual navegable**: traduce cada HU a pantallas,
+con estados vacío/carga/error. **Frontera: visual, no técnico.**
+
+**5 · Feasibility** — el ***reality check* contra el código real**. Es la **primera etapa que abre el
+repositorio**: cruza el *deber ser* (PRD) con el *es* (código) y emite gaps, **ADRs** (decisiones de
+arquitectura) y un veredicto (`viable` / `con condiciones` / `no viable` / `loop-back`). Resuelve prometer
+tareas sin saber si el repo las soporta — como descubrir que falta un SDK y disparar un ADR *antes* de
+generar tickets.
+
+**6 · Handoff** — la **traducción a tareas ejecutables**: tickets **atómicos** que un dev + Copilot toman
+sin preguntar nada (contrato, casos borde, *done criteria* y un prompt listo por tarea), ordenados en un
+**DAG** de dependencias, con trazabilidad HU→Tarea→ADR. Resuelve el "handoff" que es solo el PRD copiado
+y las tareas gigantes tipo "implementar módulo de pagos".
+
+> **La regla de oro de la altitud:** el BRD nunca habla de tecnología; el PRD nunca habla de código;
+> Feasibility es la primera que toca el repo; el Handoff es la única que genera prompts para escribir código.
+
+### 💡 Nota — cómo se podría llevar este marco a Copilot (a modo de ejemplo)
+
+Todo lo anterior es *metodología*; encaja de forma natural con los primitivos de esta guía si quisieras
+montarlo como workspace:
+
+- **Cada etapa** (`brd_prompt.md`, `feasibility_prompt.md`…) → un **custom agent** (§7), con el `tools`
+  acotado a su altitud (los primeros **solo-lectura**; Feasibility con `search/codebase` para abrir el repo).
+- **Cada HITL gate** → un **handoff** con `send:false` (§14): el humano revisa el artefacto y aprueba el
+  salto. Los **loop-backs** → *back-edges* de handoff.
+- **Las reglas transversales** (trazabilidad, altitud) → **custom instructions** del workspace (§3).
+
+Un agente de etapa se vería así (ejemplo — la frontera de altitud vive en `tools`):
+
+```markdown
+---
+name: 'sdlc-brd'
+description: 'AI-SDLC Etapa 2: info de negocio → BRD firmable. Nunca habla de tecnología.'
+tools: ['read']                        # solo-lectura → no puede bajar a lo técnico
+handoffs:
+  - label: '✓ Gate de negocio OK → PRD'
+    agent: sdlc-prd
+    prompt: 'BRD aprobado. Descomponelo en épicas + HU + AC Gherkin.'
+    send: false                        # el HITL revisa antes de avanzar
+---
+Eres el BRD Agent. Si falta un input requerido, te detenés y lo pedís — no inventás.
+```
+
+> Es solo *una forma* de implementarlo; el framework vale por su proceso, no por la herramienta.
+
+---
+
+## 16. Adopción en proyectos existentes y monorepos grandes
 
 Aplicar esto en un proyecto *greenfield* (nuevo) es fácil. El reto real es un **codebase existente, enorme, con muchos módulos, deuda técnica y convenciones no escritas**. Aquí la estrategia es distinta: **no configures todo de una vez**. Adopción incremental, por capas y por módulo.
 
@@ -1132,6 +1234,8 @@ Aquí es donde `applyTo` brilla en un monorepo. Cada módulo carga **sólo** sus
 Esto resuelve el problema de módulos que se contradicen: las reglas de Angular **nunca** contaminan el contexto cuando editas la API en C#. Y el contexto se mantiene liviano porque sólo se carga lo relevante al archivo abierto.
 
 **Empieza por 1 o 2 módulos**, los que más toques. No hace falta cubrir los 50 desde el día uno.
+
+> 🆕 En monorepos con repos anidados, el setting `chat.useCustomizationsInParentRepositories` permite que un submódulo **descubra las customizaciones del repo padre** — útil para compartir reglas base sin duplicarlas en cada carpeta.
 
 #### Fase 3 — Blindar lo que no se debe tocar
 
@@ -1218,7 +1322,7 @@ Empaqueta la migración como un **Skill** (§6) con el procedimiento y los scrip
 
 ---
 
-## 16. Operar y controlar al agente (modos, contexto, loop, permisos)
+## 17. Operar y controlar al agente (modos, contexto, loop, permisos)
 
 Hasta aquí *configuraste* al agente (instructions, prompts, skills, agents, hooks). Esta sección es
 lo otro: cómo lo **operas y lo contienes** día a día — en qué modo trabaja, qué contexto le das,
@@ -1310,7 +1414,7 @@ apruebas o deniegas cada tool call. Puedes ajustar cuánta autonomía darle:
 
 ---
 
-## 17. Estructura final del proyecto
+## 18. Estructura final del proyecto
 
 ```
 mi-proyecto/
@@ -1347,7 +1451,7 @@ mi-proyecto/
 
 ---
 
-## 18. Tabla de comandos y troubleshooting
+## 19. Tabla de comandos y troubleshooting
 
 ### Comandos en el chat
 
@@ -1380,7 +1484,7 @@ Si una instrucción/agente no se aplica:
 
 ---
 
-## 19. Tips para instrucciones efectivas
+## 20. Tips para instrucciones efectivas
 
 1. **Incluye el "por qué"** de cada regla.
    ```
@@ -1394,7 +1498,7 @@ Si una instrucción/agente no se aplica:
 
 ---
 
-## 20. Recursos oficiales
+## 21. Recursos oficiales
 
 **General**
 - [Copilot in VS Code — Overview](https://code.visualstudio.com/docs/copilot/overview)
@@ -1410,4 +1514,11 @@ Si una instrucción/agente no se aplica:
 - [MCP Servers](https://code.visualstudio.com/docs/copilot/customization/mcp-servers)
 - [Hooks](https://code.visualstudio.com/docs/copilot/customization/hooks)
 - [Agent Plugins — overview](https://code.visualstudio.com/docs/copilot/customization/overview)
-- [Awesome Copilot (ejemplos de la comunidad)](https://github.com/github/awesome-copilot)
+
+**Galerías e inspiración** *(de dónde copiar ideas para tus skills, agents, instructions y prompts)*
+- ⭐ **[Awesome GitHub Copilot](https://awesome-copilot.github.com/)** — galería oficial de la comunidad con **agents, instructions, skills, prompts y plugins** listos para copiar y adaptar. El mejor punto de partida para no arrancar de cero (ver §6, §7).
+- [Repo de Awesome Copilot en GitHub](https://github.com/github/awesome-copilot) — el código fuente de la galería.
+
+**Herramientas de autoría** *(nuevas, en preview)*
+- **Agent Customizations editor** — UI unificada (desde *Configure Chat*) para crear y gestionar todos los tipos de customización en un solo lugar.
+- **Chat Customizations Evaluations** *(extensión)* — analiza tus archivos de customización buscando **contradicciones, ambigüedades y conflictos** antes de usarlos (ver §19, Diagnostics).
