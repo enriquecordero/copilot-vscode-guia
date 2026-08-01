@@ -788,6 +788,42 @@ Eres un analista de datos. Consulta el schema real antes de sugerir migraciones.
 > de nombres). Para un agente **local** de VS Code no se usa: basta declarar el server en `mcp.json`
 > y listar sus tools en `tools`.
 
+### Ejemplo real: `codebase-memory-mcp`
+
+Un MCP muy usado que ilustra el caso "datos reales, no solo código":
+**[DeusData/codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp)** (MIT, ⭐ ~37k)
+indexa tu repo en un **grafo de conocimiento persistente** y expone tools para consultar estructura,
+llamadas, rutas HTTP, dead code, etc. — con queries en <1 ms y, según el proyecto, ~99% menos tokens
+que explorar archivo por archivo. Es un binario estático local (el código no sale de tu máquina).
+
+Registrarlo en `.vscode/mcp.json` (una vez instalado el binario):
+
+```json
+{
+  "servers": {
+    "codebase-memory": {
+      "type": "stdio",
+      "command": "codebase-memory-mcp"
+    }
+  }
+}
+```
+
+Y luego sus tools quedan disponibles para un agente — ideal para un **explorador de solo-lectura**:
+
+```yaml
+---
+name: 'repo-explorer'
+description: 'Explora la arquitectura del repo vía grafo, sin escanear archivo por archivo.'
+tools: ['read', 'codebase-memory/search', 'codebase-memory/trace']  # tools del MCP registrado
+---
+Antes de responder, consultá el grafo del codebase en vez de leer archivos sueltos.
+```
+
+> ⚠️ **Evalúa antes de instalar cualquier MCP de terceros.** Este es popular y MIT, pero corre
+> como binario local con acceso a tu código. Prefiere métodos de instalación auditables (Homebrew,
+> npm, binario firmado) sobre un `curl … | bash` a ciegas, y revisa qué permisos concede.
+
 ---
 
 ## 12. Agent Plugins (preview)
