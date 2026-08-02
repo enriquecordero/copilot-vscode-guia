@@ -23,11 +23,12 @@
 14. [Orquestación con handoffs (Planner, BE, FE, QA)](#14-orquestación-con-handoffs-planner-be-fe-qa)
 15. [El AI-SDLC: orquestación de agentes con validación humana](#15-el-ai-sdlc-orquestación-de-agentes-con-validación-humana)
 16. [Adopción en proyectos existentes y monorepos grandes](#16-adopción-en-proyectos-existentes-y-monorepos-grandes)
-17. [Operar y controlar al agente (modos, contexto, loop, permisos)](#17-operar-y-controlar-al-agente-modos-contexto-loop-permisos)
-18. [Estructura final del proyecto](#18-estructura-final-del-proyecto)
-19. [Tabla de comandos y troubleshooting](#19-tabla-de-comandos-y-troubleshooting)
-20. [Tips para instrucciones efectivas](#20-tips-para-instrucciones-efectivas)
-21. [Recursos oficiales](#21-recursos-oficiales)
+17. [Copilot en el día a día (completado, slash commands, smart actions)](#17-copilot-en-el-día-a-día-completado-slash-commands-smart-actions)
+18. [Operar y controlar al agente (modos, contexto, loop, permisos)](#18-operar-y-controlar-al-agente-modos-contexto-loop-permisos)
+19. [Estructura final del proyecto](#19-estructura-final-del-proyecto)
+20. [Tabla de comandos y troubleshooting](#20-tabla-de-comandos-y-troubleshooting)
+21. [Tips para instrucciones efectivas](#21-tips-para-instrucciones-efectivas)
+22. [Recursos oficiales](#22-recursos-oficiales)
 
 ---
 
@@ -351,7 +352,7 @@ Ver `examples/migracion-esperada.cs` como referencia del formato correcto.
 /create-skill
 ```
 
-> ⭐ **No arranques de cero.** La galería oficial **[Awesome GitHub Copilot](https://awesome-copilot.github.com/)** tiene **skills, agents, instructions, prompts y plugins** contribuidos por la comunidad, listos para copiar y adaptar. Es el mejor lugar para tomar ideas al crear tus propios skills y custom agents (§7). Ver también §21.
+> ⭐ **No arranques de cero.** La galería oficial **[Awesome GitHub Copilot](https://awesome-copilot.github.com/)** tiene **skills, agents, instructions, prompts y plugins** contribuidos por la comunidad, listos para copiar y adaptar. Es el mejor lugar para tomar ideas al crear tus propios skills y custom agents (§7). Ver también §22.
 
 ### Cómo mantenerlo
 
@@ -1358,7 +1359,66 @@ Empaqueta la migración como un **Skill** (§6) con el procedimiento y los scrip
 
 ---
 
-## 17. Operar y controlar al agente (modos, contexto, loop, permisos)
+## 17. Copilot en el día a día (completado, slash commands, smart actions)
+
+Casi toda esta guía trata de *customizar y orquestar* al agente. Pero el grueso del **uso diario**
+de Copilot son cuatro cosas simples que conviene dominar — lo que un dev toca decenas de veces al día.
+Esta sección + la §18 son la parte de *usar* Copilot; el resto es *configurarlo*.
+
+### Autocompletado: inline suggestions + Next Edit Suggestions
+
+La feature **más usada** de Copilot, y no requiere ningún setup:
+
+- **Inline suggestions** — sugerencias mientras tipeás: desde completar una línea hasta una función entera. `Tab` acepta, `Esc` descarta.
+- **Next Edit Suggestions (NES)** — predice tu **próximo cambio lógico**, no solo completa donde estás. Ej.: cambiás el tipo de un parámetro → sugiere actualizar todas las llamadas a esa función.
+
+> ⚠️ El autocompletado **no usa tus custom instructions** (esas aplican al chat/agente). Si querés que respete convenciones, eso vive en el chat, no en el completado inline.
+
+### Slash commands built-in (en el chat)
+
+Distintos de los `/create-*` de customización (§20) y de `/init`: estos son de **uso directo**.
+
+| Comando | Qué hace |
+|---|---|
+| `/explain` | Explica un bloque, archivo o concepto |
+| `/fix` | Arregla código o errores de compilador/linter |
+| `/tests` | Genera tests de lo seleccionado |
+| `/doc` | Genera comentarios de documentación (inline chat) |
+| `/new` | Scaffold de un workspace/archivo nuevo |
+| `/fixTestFailure` | Sugiere cómo arreglar tests que fallan |
+| `/clear` | Nuevo chat (contexto limpio) |
+
+### Smart actions — IA sin escribir prompts
+
+Acciones predefinidas accesibles con click derecho, el ✨ o el panel de problemas:
+
+| Acción | Cómo se accede |
+|---|---|
+| **Generar mensaje de commit** | Panel de Source Control → ✨ |
+| **Fix error** | Panel de Problems → click en el error |
+| **Explain / Generate Tests** | Click derecho → Copilot |
+| **Rename con IA** | `F2` (sugiere nombres) |
+| **Code Review** *(experimental)* | Click derecho / sobre una selección |
+
+### Inline Chat y atajos
+
+- **Inline Chat (`⌘I` / `Ctrl+I`)** — abre un chat **dentro del editor** (o la terminal), con edits in-place y diff. Ideal para refactors rápidos y correcciones puntuales sin cambiar de contexto.
+- **Atajos clave:**
+
+| Atajo (Mac · Win/Linux) | Acción |
+|---|---|
+| `Tab` · `Tab` | Aceptar sugerencia inline |
+| `Esc` · `Esc` | Descartar sugerencia |
+| `⌘I` · `Ctrl+I` | Inline Chat en el editor |
+| `⌃⌘I` · `Ctrl+Alt+I` | Abrir la Chat view |
+
+> Estos cuatro bloques cubren el grueso del uso cotidiano. El resto de la guía es para cuando querés que Copilot **conozca tu proyecto** (instructions, §3–§6) y **opere con autonomía** (agents y orquestación, §7–§16).
+>
+> Docs: [Copilot VS Code features](https://code.visualstudio.com/docs/copilot/reference/copilot-vscode-features)
+
+---
+
+## 18. Operar y controlar al agente (modos, contexto, loop, permisos)
 
 Hasta aquí *configuraste* al agente (instructions, prompts, skills, agents, hooks). Esta sección es
 lo otro: cómo lo **operas y lo contienes** día a día — en qué modo trabaja, qué contexto le das,
@@ -1450,7 +1510,7 @@ apruebas o deniegas cada tool call. Puedes ajustar cuánta autonomía darle:
 
 ---
 
-## 18. Estructura final del proyecto
+## 19. Estructura final del proyecto
 
 ```
 mi-proyecto/
@@ -1487,7 +1547,7 @@ mi-proyecto/
 
 ---
 
-## 19. Tabla de comandos y troubleshooting
+## 20. Tabla de comandos y troubleshooting
 
 ### Comandos en el chat
 
@@ -1520,7 +1580,7 @@ Si una instrucción/agente no se aplica:
 
 ---
 
-## 20. Tips para instrucciones efectivas
+## 21. Tips para instrucciones efectivas
 
 1. **Incluye el "por qué"** de cada regla.
    ```
@@ -1534,7 +1594,7 @@ Si una instrucción/agente no se aplica:
 
 ---
 
-## 21. Recursos oficiales
+## 22. Recursos oficiales
 
 **General**
 - [Copilot in VS Code — Overview](https://code.visualstudio.com/docs/copilot/overview)
@@ -1557,4 +1617,4 @@ Si una instrucción/agente no se aplica:
 
 **Herramientas de autoría** *(nuevas, en preview)*
 - **Agent Customizations editor** — UI unificada (desde *Configure Chat*) para crear y gestionar todos los tipos de customización en un solo lugar.
-- **Chat Customizations Evaluations** *(extensión)* — analiza tus archivos de customización buscando **contradicciones, ambigüedades y conflictos** antes de usarlos (ver §19, Diagnostics).
+- **Chat Customizations Evaluations** *(extensión)* — analiza tus archivos de customización buscando **contradicciones, ambigüedades y conflictos** antes de usarlos (ver §20, Diagnostics).

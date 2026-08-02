@@ -21,6 +21,18 @@ TEMPLATE = r"""<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GitHub Copilot en VS Code — Guía completa</title>
 <meta name="description" content="Guía y documentación completa de Context Engineering con GitHub Copilot en VS Code: instructions, prompts, skills, custom agents, orquestación, hooks, MCP y adopción en monorepos.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230d1117'/><text x='50' y='72' font-size='60' text-anchor='middle' fill='%234493f8' font-family='Helvetica,Arial,sans-serif' font-weight='700'>C</text></svg>">
+<meta property="og:type" content="website">
+<meta property="og:title" content="GitHub Copilot en VS Code — Guía completa">
+<meta property="og:description" content="Context Engineering con Copilot: instructions, prompts, skills, custom agents, orquestación, handoffs, hooks, MCP y AI-SDLC.">
+<meta property="og:url" content="https://enriquecordero.github.io/copilot-vscode-guia/">
+<meta property="og:image" content="https://enriquecordero.github.io/copilot-vscode-guia/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="GitHub Copilot en VS Code — Guía completa">
+<meta name="twitter:description" content="Context Engineering con Copilot: instructions, agents, orquestación, hooks, MCP y AI-SDLC.">
+<meta name="twitter:image" content="https://enriquecordero.github.io/copilot-vscode-guia/og.png">
 <link id="hljs-light" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css">
 <link id="hljs-dark" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" disabled>
 <style>
